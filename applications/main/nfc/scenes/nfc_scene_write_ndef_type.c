@@ -6,7 +6,10 @@ enum SubmenuIndex {
     SubmenuIndexPhone = NdefWriteRecordTypePhone,
     SubmenuIndexText = NdefWriteRecordTypeText,
     SubmenuIndexWifi = NdefWriteRecordTypeWifi,
+    SubmenuIndexRickRoll = 100, // Sentinel: short-circuit straight to write
 };
+
+#define RICKROLL_URL "https://youtu.be/dQw4w9WgXcQ"
 
 static void nfc_scene_write_ndef_type_submenu_callback(void* context, uint32_t index) {
     NfcApp* instance = context;
@@ -31,6 +34,12 @@ void nfc_scene_write_ndef_type_on_enter(void* context) {
         SubmenuIndexWifi,
         nfc_scene_write_ndef_type_submenu_callback,
         instance);
+    submenu_add_item(
+        submenu,
+        "Save RR",
+        SubmenuIndexRickRoll,
+        nfc_scene_write_ndef_type_submenu_callback,
+        instance);
 
     submenu_set_selected_item(
         submenu, scene_manager_get_scene_state(instance->scene_manager, NfcSceneWriteNdefType));
@@ -42,12 +51,20 @@ bool nfc_scene_write_ndef_type_on_event(void* context, SceneManagerEvent event) 
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        instance->ndef_write.record_type = (NdefWriteRecordType)event.event;
         instance->ndef_write.input_step = NdefWriteInputStepPrimary;
         furi_string_reset(instance->ndef_write.primary);
         furi_string_reset(instance->ndef_write.secondary);
         scene_manager_set_scene_state(instance->scene_manager, NfcSceneWriteNdefType, event.event);
-        scene_manager_next_scene(instance->scene_manager, NfcSceneWriteNdefInput);
+
+        if(event.event == SubmenuIndexRickRoll) {
+            // Pre-fill a URI record and skip the input scene entirely.
+            instance->ndef_write.record_type = NdefWriteRecordTypeUri;
+            furi_string_set(instance->ndef_write.primary, RICKROLL_URL);
+            scene_manager_next_scene(instance->scene_manager, NfcSceneWriteNdefTag);
+        } else {
+            instance->ndef_write.record_type = (NdefWriteRecordType)event.event;
+            scene_manager_next_scene(instance->scene_manager, NfcSceneWriteNdefInput);
+        }
         consumed = true;
     }
 
